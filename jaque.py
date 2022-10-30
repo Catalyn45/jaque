@@ -4,10 +4,10 @@ from exceptions import UnexpectedToken, UnrecognizedToken
 
 class Tokenizer:
     def __init__(self, content):
-        self.index = 0
-        self.line = 0
-        self.col = 0
-        self.content = content
+        self.index = 0             # current character index
+        self.line = 0              # keeping track of the line
+        self.col = 0               # and the column
+        self.content = content     # string content
 
     def advance(self):
         self.col += 1
@@ -24,6 +24,9 @@ class Tokenizer:
 
     def read_word(self):
         word = ""
+
+        # these are the characters for "true", "false", "null"
+        # no other keywords can exist
         while self.get_char() in "truefalsn":
             word += self.content[self.index]
             self.advance()
@@ -41,6 +44,7 @@ class Tokenizer:
         if final == -1:
             raise UnexpectedToken(EOFToken(line=self.line, col=self.col), CharToken('"'), self.content)
 
+        # get the string betweeen the ""
         tok = StringToken(self.content[self.index + 1:final], self.line, self.col)
         self.col += final - self.index
         self.index = final
@@ -52,6 +56,8 @@ class Tokenizer:
         number = ""
 
         current_char = self.get_char()
+
+        # we allow - because numbers can be negative
         if current_char == '-':
             number += current_char
             self.advance()
@@ -59,8 +65,11 @@ class Tokenizer:
         while not self.eof():
             current_char = self.get_char()
 
+            # if we find a . that means that the number
+            # is floating point
             if current_char == '.':
                 if not is_int:
+                    # can't be two or more . in a float number
                     raise UnexpectedToken(CharToken('.', line=self.line, col=self.col), IntToken(), self.content)
 
                 number += current_char
@@ -70,6 +79,8 @@ class Tokenizer:
                 number += current_char
 
             else:
+                # decrease index because the get_next_token will increase it
+                # anyway so we don't skip characters
                 self.index -= 1
                 self.col -= 1
                 return is_int and IntToken(int(number), self.line, self.col) or FloatToken(float(number), self.line, self.col)
@@ -77,11 +88,15 @@ class Tokenizer:
             self.advance()
 
     def get_next_token(self):
+        # if we are at the end of the string we
+        # return an EOF token, this makes it easy
+        # for the parser to know when the string ends
         if self.eof():
             return EOFToken(line=self.line, col=self.col)
 
         current_char = self.get_char()
 
+        # ignoring whitespaces
         while current_char in " \r\f\t\n":
             if current_char == '\n':
                 self.line += 1
@@ -95,9 +110,11 @@ class Tokenizer:
 
         if current_char == '"':
             tok = self.tokenize_string()
+
         elif current_char == '-' or current_char.isdigit():
             tok = self.tokenize_number()
-        elif current_char in '(){}[]:,':
+
+        elif current_char in '{}[]:,':
             tok = CharToken(current_char, self.line, self.col)
         else:
             word = self.read_word()
@@ -112,7 +129,6 @@ class Tokenizer:
 
 class Parser:
     def __init__(self, content):
-        self.index = 0
         self.content = content
         self.tokenizer = Tokenizer(content)
         self.current_token = None
@@ -121,6 +137,7 @@ class Parser:
         return self.current_token
 
     def advance(self):
+        # get the next token from the tokenizer
         self.current_token = self.tokenizer.get_next_token()
 
     def get_advance(self):
@@ -137,6 +154,9 @@ class Parser:
             raise UnexpectedToken(token, StringToken(), self.content)
 
     def expect_char(self, char):
+        # if we do not have what we are expecting
+        # then the json is not valid so we throw an
+        # UnexpectedToken exception
         token = self.get_advance()
         if token != CharToken(char):
             raise UnexpectedToken(token, CharToken(char), self.content)
@@ -172,6 +192,8 @@ class Parser:
         obj = {}
 
         while True:
+            # the dict can be empty or containing a , before
+            # it ends
             if self.check_char('}'):
                 break
 
@@ -184,6 +206,7 @@ class Parser:
 
             obj[key.value] = value
 
+            # if we have nor more , we stop
             if not self.check_char(","):
                 break
 
@@ -198,12 +221,15 @@ class Parser:
 
         values = []
         while True:
+            # the list can be empty or containing a , before
+            # it ends
             if self.check_char("]"):
                 break
 
             value = self.parse_value()
             values.append(value)
 
+            # if we have nor more , we stop
             if not self.check_char(","):
                 break
 
@@ -215,6 +241,8 @@ class Parser:
 
     def parse_body(self):
         self.advance()
+
+        # only dict or list can be root
         if self.check_char('{'):
             return self.parse_object()
 
