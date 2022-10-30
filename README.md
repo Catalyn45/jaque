@@ -27,7 +27,7 @@ OBJECT:    "{" ( OBJECT_EL ("," OBJECT_EL)* ","?)? "}"
 
 OBJECT_EL: STRING ":" VALUE
 
-LIST:      "{" ( VALUE ("," VALUE)* ","?)? "}"
+LIST:      "[" ( VALUE ("," VALUE)* ","?)? "]"
 
 VALUE:     OBJECT |
            LIST   |
