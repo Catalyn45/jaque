@@ -1,0 +1,14 @@
+[
+    {
+        "product_id": 1.05.0,
+        "tags": [
+            "windows",
+            "linux"
+        ],
+        "price": null
+    },
+    [
+        "zz": 1,
+        "zzz": 3
+    ]
+]
