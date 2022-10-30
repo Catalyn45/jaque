@@ -3,21 +3,23 @@ from exceptions import UnexpectedToken, UnrecognizedToken
 
 
 class Tokenizer:
-    def __init__(self):
+    def __init__(self, content):
         self.index = 0
-        self.tokens = []
-        self.content = None
         self.line = 0
         self.col = 0
+        self.content = content
 
     def advance(self):
-        if self.index >= len(self.content):
-            raise UnexpectedToken(EOFToken(), Token(), self.content)
-
         self.col += 1
         self.index += 1
 
+    def eof(self):
+        return self.index >= len(self.content)
+
     def get_char(self):
+        if self.eof():
+            raise UnexpectedToken(EOFToken(), Token(), self.content)
+
         return self.content[self.index]
 
     def read_word(self):
@@ -54,7 +56,7 @@ class Tokenizer:
             number += current_char
             self.advance()
 
-        while self.index < len(self.content):
+        while not self.eof():
             current_char = self.get_char()
 
             if current_char == '.':
@@ -74,58 +76,52 @@ class Tokenizer:
 
             self.advance()
 
-    def tokenize(self, content):
-        self.index = 0
-        self.line = 0
-        self.col = 0
-        self.content = content
-        self.tokens = list()
+    def get_next_token(self):
+        if self.eof():
+            return EOFToken(line=self.line, col=self.col)
 
-        while self.index < len(self.content):
-            current_char = self.content[self.index]
+        current_char = self.get_char()
 
-            if current_char in " \r\f\t\n":
-                if current_char == '\n':
-                    self.line += 1
-                    self.col = -1
+        while current_char in " \r\f\t\n":
+            if current_char == '\n':
+                self.line += 1
+                self.col = -1
 
-                self.advance()
-                continue
-
-            elif current_char == '"':
-                tok = self.tokenize_string()
-            elif current_char == '-' or current_char.isdigit():
-                tok = self.tokenize_number()
-            elif current_char in '(){}[]:,':
-                tok = CharToken(current_char, self.line, self.col)
-            else:
-                word = self.read_word()
-                if word in ["true", "false", "null"]:
-                    tok = WordToken(word, self.line, self.col - len(word))
-                else:
-                    raise UnrecognizedToken(word, self.line, self.col - len(word), self.content)
-
-            self.tokens.append(tok)
             self.advance()
+            if self.eof():
+                return EOFToken(line=self.line, col=self.col)
 
-        self.tokens.append(EOFToken(None, self.line, self.col))
-        return self.tokens
+            current_char = self.get_char()
+
+        if current_char == '"':
+            tok = self.tokenize_string()
+        elif current_char == '-' or current_char.isdigit():
+            tok = self.tokenize_number()
+        elif current_char in '(){}[]:,':
+            tok = CharToken(current_char, self.line, self.col)
+        else:
+            word = self.read_word()
+            if word in ["true", "false", "null"]:
+                tok = WordToken(word, self.line, self.col - len(word))
+            else:
+                raise UnrecognizedToken(word, self.line, self.col - len(word), self.content)
+
+        self.advance()
+        return tok
 
 
 class Parser:
-    def __init__(self):
+    def __init__(self, content):
         self.index = 0
-        self.tokens = None
-        self.content = None
+        self.content = content
+        self.tokenizer = Tokenizer(content)
+        self.current_token = None
 
     def get_tok(self):
-        return self.tokens[self.index]
+        return self.current_token
 
     def advance(self):
-        if self.index >= len(self.tokens):
-            raise UnexpectedToken(EOFToken(), Token(), self.content)
-
-        self.index += 1
+        self.current_token = self.tokenizer.get_next_token()
 
     def get_advance(self):
         tok = self.get_tok()
@@ -218,26 +214,20 @@ class Parser:
         return values
 
     def parse_body(self):
+        self.advance()
         if self.check_char('{'):
             return self.parse_object()
 
         if self.check_char('['):
             return self.parse_list()
 
-    def parse(self, content, tokens):
-        self.index = 0
-        self.tokens = tokens
-        self.content = content
-
+    def parse(self, content):
         return self.parse_body()
 
 
 def LoadString(content):
-    tokenizer = Tokenizer()
-    tokens = tokenizer.tokenize(content)
-
-    parser = Parser()
-    return parser.parse(content, tokens)
+    parser = Parser(content)
+    return parser.parse(content)
 
 
 if __name__ == "__main__":
