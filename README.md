@@ -11,6 +11,7 @@ into a python `dict`
 examples for testing:
 
 `python jaque.py '{"a": 10, "b": "dog"}'`
+
 `cat ./json_file.json | xargs python jaque.py`
 
 you can run the tests with
